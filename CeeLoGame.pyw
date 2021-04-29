@@ -4,29 +4,31 @@ from sys import argv, exit
 from os import path
 from logging import basicConfig, getLogger, DEBUG, INFO, CRITICAL
 from pickle import dump, load
-import PyQtStarterResources_rc
+import CeeLoResources_rc
 from PyQt5 import QtGui, uic
 from PyQt5.QtCore import pyqtSlot, QSettings, Qt, QTimer, QCoreApplication
 from PyQt5.QtWidgets import QMainWindow, QApplication, QDialog, QMessageBox
+import die
+
 
 startingDummyVariableDefault = 100
 textOutputDefault = " ---- "
-logFilenameDefault = 'PyQtStarter.log'
+logFilenameDefault = 'CeeLoGame.log'
 createLogFileDefault = False
-pickleFilenameDefault = ".PyQtStarterSavedObjects.pl"
+pickleFilenameDefault = ".CeeLoGameSavedObjects.pl"
 firstVariableDefault = 42
 secondVariableDefault = 99
 thirdVariableDefault = 2001
 
 
-class PyQtStarter(QMainWindow):
-    """A basic shell for a PyQt Project."""
+class CeeLoGame(QMainWindow):
+    """A game of CeeLo."""
+    die1 = die2 = die3 = None
 
     def __init__(self, parent=None):
-        """ Build a GUI  main window for PyQtStarter."""
-
+        """Build a game with three dice."""
         super().__init__(parent)
-        self.logger = getLogger("Fireheart.PyQtStarter")
+        self.logger = getLogger("Buttaufuoco.CeeLoGame")
         self.appSettings = QSettings()
         self.quitCounter = 0;       # used in a workaround for a QT5 bug.
 
@@ -39,22 +41,59 @@ class PyQtStarter(QMainWindow):
         except FileNotFoundError:
             self.restartGame()
 
-        uic.loadUi("PyQtStarterMainWindow.ui", self)
-
-        self.dummyVariable = True
-        self.textOutput = ""
-
-        self.preferencesSelectButton.clicked.connect(self.preferencesSelectButtonClickedHandler)
-        self.pushButton.clicked.connect(self.pushButtonClickedHandler)
+        uic.loadUi("CeeLoGameWindow.ui", self)
+        self.die1 = die.Die()
+        self.die2 = die.Die()
+        self.die3 = die.Die()
+        self.numberOfWins = 0
+        self.numberOfLosses = 0
+        self.currentBank = 1000
+        self.currentBet = 0
+        self.rollButton.clicked.connect(self.rollButtonClickedHandler)
 
     def __str__(self):
-        """String representation for PyQtStarter.
-        """
-
-        return "Gettin' started with Qt!!"
+        """String representation for Cee Lo."""
+        return "Die1: %s\nDie2: %s\nDie3: %s" % (self.die1, self.die2, self.die3)
 
     def updateUI(self):
-        self.textOutputUI.setText(self.textOutput)
+        self.die1View.setPixmap(QtGui.QPixmap(":/images/" + str(self.die1.getValue())))
+        self.die2View.setPixmap(QtGui.QPixmap(":/images/" + str(self.die2.getValue())))
+        self.die3View.setPixmap(QtGui.QPixmap(":/images/" + str(self.die3.getValue())))
+        self.winsCountValueUI.setText(str(self.numberOfWins))
+        self.lossCountValueUI.setText(str(self.numberOfLosses))
+        self.currentBankUI.setText(str(self.currentBank))
+
+    # Player asked for another roll of the dice.
+    def rollButtonClickedHandler(self):
+        print("Roll button clicked")
+        firstRoll = True
+        rollValue = self.die1.roll() + self.die2.roll()+ self.die3.roll()
+        self.currentBet = self.spinBox.value()
+        if firstRoll:
+            print("You rolled a {0}".format(rollValue))
+            if rollValue in (1, 2, 3):
+                print("You Lost.")
+                self.numberOfLosses += 1
+                self.currentBank -= self.currentBet
+            elif rollValue in (4, 5, 6):
+                print("You Won!")
+                self.numberOfWins += 1
+                self.currentBank += self.currentBet
+            else:
+                self.previousRoll = rollValue
+                self.firstroll = False
+        else:
+            rollValue = self.die1.roll(), self.die2.roll(), self.die3.roll()
+            if rollValue == self.previousRoll:
+                print("Congrats You Won!")
+                self.numberOfWins += 1
+                self.currentBank += self.currentBet
+            else:
+                print("Sorry You Lost.")
+                self.numberOfLoses += 1
+                self.currentBank -= self.currentBet
+            self.firstRoll = True
+        self.updateUI()
 
         # Player asked for another roll of the dice.
     def restartGame(self):
@@ -121,13 +160,6 @@ class PyQtStarter(QMainWindow):
             self.pickleFilename = pickleFilenameDefault
             self.appSettings.setValue('pickleFilename', self.pickleFilename)
 
-    def pushButtonClickedHandler(self):
-        print("Inside pushButtonClickedHandler()\n")
-        if (self.textOutput != "Hello World!" or self.textOutput == ""):
-            self.textOutput = "Hello World!"
-        else:
-            self.textOutput = "Happy to Meet You."
-        self.updateUI()
 
     @pyqtSlot()  # User is requesting preferences editing dialog box.
     def preferencesSelectButtonClickedHandler(self):
@@ -156,11 +188,11 @@ class PyQtStarter(QMainWindow):
                 event.ignore()
 
 class PreferencesDialog(QDialog):
-    def __init__(self, parent = PyQtStarter):
+    def __init__(self, parent = CeeLoGame):
         super(PreferencesDialog, self).__init__()
 
         uic.loadUi('preferencesDialog.ui', self)
-        self.logger = getLogger("Fireheart.PyQtStarter")
+        self.logger = getLogger("Buttafuoco.CeeLoGame")
 
         self.appSettings = QSettings()
         if self.appSettings.contains('firstVariable'):
@@ -248,9 +280,9 @@ class PreferencesDialog(QDialog):
         self.close()
 
 if __name__ == "__main__":
-    QCoreApplication.setOrganizationName("Fireheart Software");
-    QCoreApplication.setOrganizationDomain("fireheartsoftware.com");
-    QCoreApplication.setApplicationName("PyQtStarter");
+    QCoreApplication.setOrganizationName("Buttafuoco Software");
+    QCoreApplication.setOrganizationDomain("buttafuocosoftware.com");
+    QCoreApplication.setApplicationName("CeeLoGame");
     appSettings = QSettings()
     if appSettings.contains('createLogFile'):
         createLogFile = appSettings.value('createLogFile')
@@ -268,7 +300,7 @@ if __name__ == "__main__":
         basicConfig(filename=path.join(startingFolderName, logFilename), level=INFO,
                     format='%(asctime)s %(name)-8s %(levelname)-8s %(message)s')
     app = QApplication(argv)
-    PyQtStarterApp = PyQtStarter()
-    PyQtStarterApp.updateUI()
-    PyQtStarterApp.show()
+    CeeLoGameApp = CeeLoGame()
+#    CeeLoGame.updateUI()
+    CeeLoGameApp.show()
     exit(app.exec_())
